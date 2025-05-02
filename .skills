@@ -1,0 +1,19 @@
+- nodejs
+- bun
+- nextjs
+- elysiajs
+- reactjs
+- expressjs
+- aws
+  - s3
+  - dynamodb
+  - cloudwatch
+- docker
+- docker-compose
+- redis
+- REST api
+- react-native
+- expo
+- shadcn
+- tailwindcss
+- ai-agents w/ n8n

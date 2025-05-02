@@ -47,7 +47,7 @@ Default output format: None
 4. `ssh -i "path/to/keypair.pem" ec2-user@ec2-XX-XXX-XX-XXX.ap-south-1.compute.amazonaws.com` - to ssh into ec2 instance
 5. `sudo yum update -y` - update the system
 6. `aws configure` - login with aws credentials
-7. Edit inbound rules in security groups, expose port 3001, 3000 & 80 and add 0.0.0.0/0 to access the instance from anywhere
+7. Edit inbound rules in security groups, expose port 22, 3001, 3000, 80 & 443, add 0.0.0.0/0 to access the instance from anywhere
 8. Create Elastic IP and allocate it to ec2 instance
 
 ### Install Docker, Docker-compose
@@ -98,29 +98,43 @@ sudo systemctl enable nginx
 
 1. Paste this into server block
 
-```lua
-location /api/ {
-    proxy_pass http://localhost:3001/;
-    proxy_http_version 1.1;
-    proxy_set_header Upgrade $http_upgrade;
-    proxy_set_header Connection 'upgrade';
-    proxy_set_header Host $host;
-    proxy_cache_bypass $http_upgrade;
+```conf
+server {
+    listen       80;
+    listen       [::]:80;
+    server_name  ignoumate.in www.ignoumate.in;
+    root         /usr/share/nginx/html;
+
+    include /etc/nginx/default.d/*.conf;
+
+    location /api/ {
+        proxy_pass http://localhost:3001/;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_cache_bypass $http_upgrade;
+    }
+
+    location / {
+        proxy_pass http://localhost:3000/;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_cache_bypass $http_upgrade;
+    }
 }
 
-location / {
-    proxy_pass http://localhost:3000/;
-    proxy_http_version 1.1;
-    proxy_set_header Upgrade $http_upgrade;
-    proxy_set_header Connection 'upgrade';
-    proxy_set_header Host $host;
-    proxy_cache_bypass $http_upgrade;
-}
 ```
 
 2. `sudo nginx -t` - to check if nginx.conf syntax is right
 3. `sudo systemctl reload nginx`
 4. delete 3001 & 3000 ports from instance security groups
+5. `sudo yum install -y certbot python3-certbot-nginx`
+6. `sudo certbot --nginx -d ignoumate.in -d www.ignoumate.in` - generate a certificate
+7. `sudo nginx -t` - to check if nginx.conf syntax is right
+8. `sudo systemctl reload nginx`
 
 ### Continuous Integration
 
@@ -144,7 +158,7 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v2
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ap-south-1
 
@@ -152,12 +166,16 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v1
 
+      - name: Get short SHA
+        id: vars
+        run: echo "SHORT_SHA=${GITHUB_SHA::7}" >> $GITHUB_ENV
+
       - name: Build, tag, and push image to Amazon ECR
         id: build-image
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          ECR_REPOSITORY: NAME_OF_ECR_REPOSITORY
-          IMAGE_TAG: ${{ github.sha }}
+          ECR_REPOSITORY: ECR_REPO_NAME
+          IMAGE_TAG: ${{ env.SHORT_SHA }}
         run: |
           docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG

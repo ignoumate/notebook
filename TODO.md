@@ -1,5 +1,11 @@
-- write tests for mentors, student/profile, auth - login & register and subscription
+[] write tests for mentors, student/profile, auth
+[] login & register and subscription
 
-- create web - nextjs
+[] create web
+[] nextjs
 
-- create app - expo
+[] create app
+[] expo
+
+[] ai agents
+[]
